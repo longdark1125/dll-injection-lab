@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 #define TARGET_PROCESS "notepad.exe"
-#define DLL_PATH "C:\\Users\\namkg\\Downloads\\dll-injection-lab-main\\dll-injection-lab-main\\week4-injection\\dll\\keylogger_polling.dll"
+#define DLL_PATH "C:\\Users\\namkg\\Downloads\\dll-injection-lab-main\\dll-injection-lab-main\\week4-injection\\dll\\keylogger.dll"
 #define MAX_PROCESSES 200
 
 BOOL InjectDLL(DWORD processId, const char* dllPath) {

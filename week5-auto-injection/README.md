@@ -8,7 +8,7 @@ Adobe Acrobat 실행을 자동으로 감지하여 키로거 DLL을 자동 주입
 
 ## 동작 원리
 1. 1초마다 프로세스 목록 스캔
-2. 새로운 Acrobat.exe 프로세스 감지
+2. 새로운 msedge.exe 프로세스 감지
 3. 2초 대기 (프로세스 안정화)
 4. keylogger.dll 자동 주입
 5. 키로깅 시작
@@ -24,20 +24,20 @@ process_monitor.exe
 
 ### 2단계: PDF 파일 열기
 - 아무 PDF 파일 더블클릭
-- Adobe Acrobat으로 열림
+- msedge로 열림
 
 ### 3단계: 자동 인젝션 확인
 콘솔에 다음 메시지가 나타남:
 ```
 [!] NEW TARGET DETECTED!
-[*] Process: Acrobat.exe (PID: ...)
+[*] Process: msedge.exe (PID: ...)
 [+] Injecting into PID: ...
 [+] DLL injected successfully!
 [SUCCESS] Keylogger activated!
 ```
 
 ### 4단계: 테스트
-- Adobe Acrobat에서 Ctrl+F (찾기) 또는 메모 입력
+- msedge에서 Ctrl+F (찾기) 또는 메모 입력
 - C:\keylog_dll.txt 파일 확인
 
 ## 3단계 진화 과정

